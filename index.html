@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoDiag — Sistema de Apoio ao Diagnóstico Automotivo</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6f8;color:#17202a}
+header{background:#111827;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:24px;font-weight:800}.logo span{color:#f59e0b}
+button{border:0;border-radius:9px;padding:11px 16px;cursor:pointer;font-weight:700}
+.btn{background:#f59e0b;color:#111827}.secondary{background:#e5e7eb;color:#111827}
+.container{max-width:1100px;margin:28px auto;padding:0 18px}
+.card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 4px 18px #00000010;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+label{display:block;font-weight:700;margin-bottom:6px}input,select{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:9px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.hidden{display:none}
+.badge{display:inline-block;background:#fff7ed;color:#9a3412;padding:5px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.result{border-left:5px solid #f59e0b;padding:14px;background:#fafafa;border-radius:8px;margin:10px 0}
+small{color:#6b7280}.danger{color:#b91c1c}.success{color:#15803d}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left}
+.login{max-width:430px;margin:70px auto}
+h1,h2,h3{margin-top:0}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Auto<span>Diag</span></div>
+  <div id="userBox"></div>
+</header>
+
+<div id="loginView" class="login card">
+  <h1>Acesso ao AutoDiag</h1>
+  <p>Entre para registrar e consultar seus diagnósticos.</p>
+  <label>E-mail</label><input id="email" type="email" placeholder="usuario@autodiag.com">
+  <br><label>Senha</label><input id="password" type="password" placeholder="123456">
+  <br><button class="btn" onclick="login()">Entrar</button>
+  <p id="loginMsg" class="danger"></p>
+  <small>Demo acadêmica: use <b>admin@autodiag.com</b> / <b>123456</b>.</small>
+</div>
+
+<div id="app" class="container hidden">
+  <nav>
+    <button class="btn" onclick="show('dashboard')">Dashboard</button>
+    <button class="secondary" onclick="show('diagnosis')">Novo diagnóstico</button>
+    <button class="secondary" onclick="show('history')">Histórico</button>
+    <button class="secondary" onclick="show('library')">Biblioteca</button>
+    <button id="adminBtn" class="secondary hidden" onclick="show('admin')">Administração</button>
+  </nav>
+
+  <section id="dashboard" class="page">
+    <div class="card">
+      <h1>Dashboard</h1>
+      <p>Bem-vindo ao AutoDiag. Utilize o sistema para organizar o raciocínio diagnóstico e apoiar o aprendizado.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><small>Diagnósticos salvos</small><h2 id="countDiag">0</h2></div>
+      <div class="card"><small>Veículos disponíveis</small><h2>5</h2></div>
+      <div class="card"><small>Sintomas cadastrados</small><h2>6</h2></div>
+    </div>
+  </section>
+
+  <section id="diagnosis" class="page hidden">
+    <div class="card">
+      <h2>Novo diagnóstico</h2>
+      <div class="grid">
+        <div><label>Marca</label><select id="make"><option>Chevrolet</option><option>Volkswagen</option><option>Fiat</option><option>Ford</option><option>Hyundai</option></select></div>
+        <div><label>Modelo</label><select id="model"><option>Onix</option><option>Gol</option><option>Uno</option><option>Ka</option><option>HB20</option></select></div>
+        <div><label>Ano</label><input id="year" value="2022"></div>
+        <div><label>Motor</label><input id="engine" placeholder="1.0"></div>
+      </div>
+      <br>
+      <label>Sintoma principal</label>
+      <select id="symptom">
+        <option value="no_start">Motor não liga</option>
+        <option value="hard_start">Dificuldade para ligar</option>
+        <option value="misfire">Motor falhando</option>
+        <option value="overheat">Superaquecimento</option>
+        <option value="power_loss">Perda de potência</option>
+        <option value="check_engine">Luz da injeção acesa</option>
+      </select>
+      <br><br><button class="btn" onclick="runDiagnosis()">Executar diagnóstico</button>
+    </div>
+    <div id="results" class="card hidden"></div>
+  </section>
+
+  <section id="history" class="page hidden">
+    <div class="card"><h2>Histórico de diagnósticos</h2><div id="historyTable"></div></div>
+  </section>
+
+  <section id="library" class="page hidden">
+    <div class="card"><h2>Biblioteca técnica</h2><div id="libraryList"></div></div>
+  </section>
+
+  <section id="admin" class="page hidden">
+    <div class="card"><h2>Administração</h2><p>Área reservada ao perfil administrador. Nesta versão, a função demonstra controle de acesso por perfil.</p><span class="badge">ADMIN</span></div>
+  </section>
+</div>
+
+<script>
+const USERS=[{email:"admin@autodiag.com",password:"123456",name:"Administrador",role:"ADMIN"}];
+const rules={
+no_start:[["Bateria com baixa carga",80,"Bateria"],["Terminais/cabos da bateria",65,"Bateria"],["Motor de partida",45,"Motor de partida"],["Sistema de combustível",30,"Bomba/filtro de combustível"],["Sistema de ignição",25,"Velas/bobinas"]],
+hard_start:[["Bateria com baixa carga",55,"Bateria"],["Velas desgastadas",50,"Velas de ignição"],["Pressão de combustível inadequada",45,"Bomba de combustível"],["Sensor ou gerenciamento eletrônico",30,"Sistema de injeção"]],
+misfire:[["Velas de ignição",70,"Velas"],["Bobina de ignição",60,"Bobina"],["Injetor sujo/defeituoso",45,"Injetores"],["Entrada de ar falsa",30,"Admissão"]],
+overheat:[["Nível de líquido de arrefecimento baixo",75,"Radiador/arrefecimento"],["Ventoinha não acionando",60,"Ventoinha"],["Válvula termostática",45,"Termostática"],["Bomba d'água",35,"Bomba d'água"]],
+power_loss:[["Filtro de combustível/ar",55,"Filtros"],["Falha de ignição",50,"Velas/bobina"],["Pressão de combustível",45,"Bomba de combustível"],["Restrição no escape",25,"Sistema de escape"]],
+check_engine:[["Falha registrada na ECU",70,"Sistema de injeção"],["Sensor com leitura incorreta",55,"Sensores"],["Falha de ignição",45,"Velas/bobina"],["Mistura ar/combustível inadequada",40,"Injeção"]]
+};
+const procedures=["Inspeção visual","Verificação de conectores e cabos","Medição elétrica quando aplicável","Teste do componente suspeito","Registro do resultado e próxima hipótese"];
+const library=["Bateria — alimentação elétrica e partida","Motor de partida — acionamento do motor","Velas de ignição — geração da centelha","Bobina — elevação da tensão de ignição","Radiador — dissipação de calor","Ventoinha — controle de temperatura","Bomba de combustível — pressurização do combustível","Filtros — retenção de contaminantes"];
+
+function login(){
+ const e=email.value.trim(),p=password.value;
+ const u=USERS.find(x=>x.email===e&&x.password===p);
+ if(!u){loginMsg.textContent="E-mail ou senha inválidos.";return}
+ localStorage.setItem("autodiag_user",JSON.stringify(u));start(u);
+}
+function start(u){
+ loginView.classList.add("hidden");app.classList.remove("hidden");
+ userBox.innerHTML=`${u.name} · ${u.role} <button class="secondary" onclick="logout()">Sair</button>`;
+ adminBtn.classList.toggle("hidden",u.role!=="ADMIN");refresh();
+}
+function logout(){localStorage.removeItem("autodiag_user");location.reload()}
+function show(id){document.querySelectorAll(".page").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="history")renderHistory()}
+function runDiagnosis(){
+ const u=JSON.parse(localStorage.getItem("autodiag_user"));
+ const key=symptom.value, r=rules[key];
+ const vehicle=`${make.value} ${model.value} ${year.value} — ${engine.value||"motor não informado"}`;
+ const html=`<h2>Resultado do diagnóstico</h2><p><b>Veículo:</b> ${vehicle}</p><p><b>Sintoma:</b> ${symptom.options[symptom.selectedIndex].text}</p>`+
+ r.map((x,i)=>`<div class="result"><b>${i+1}. ${x[0]}</b><br><span class="badge">Probabilidade indicativa: ${x[1]}%</span><br><small>Componente: ${x[2]}</small></div>`).join("")+
+ `<h3>Sequência sugerida</h3><ol>${procedures.map(x=>`<li>${x}</li>`).join("")}</ol><p><small>O resultado é apoio educacional e não substitui diagnóstico técnico profissional.</small></p><button class="btn" onclick="saveDiagnosis()">Salvar diagnóstico</button>`;
+ results.innerHTML=html;results.classList.remove("hidden");
+ window.currentDiag={vehicle,symptom:symptom.options[symptom.selectedIndex].text,causes:r.map(x=>x[0]),date:new Date().toLocaleString("pt-BR"),user:u.email};
+}
+function saveDiagnosis(){
+ const arr=JSON.parse(localStorage.getItem("autodiag_history")||"[]");
+ arr.unshift(window.currentDiag);localStorage.setItem("autodiag_history",JSON.stringify(arr));refresh();
+ alert("Diagnóstico salvo no histórico.");
+}
+function renderHistory(){
+ const arr=JSON.parse(localStorage.getItem("autodiag_history")||"[]");
+ historyTable.innerHTML=arr.length?`<table><tr><th>Data</th><th>Veículo</th><th>Sintoma</th></tr>${arr.map(x=>`<tr><td>${x.date}</td><td>${x.vehicle}</td><td>${x.symptom}</td></tr>`).join("")}</table>`:"<p>Nenhum diagnóstico salvo.</p>";
+}
+function refresh(){countDiag.textContent=(JSON.parse(localStorage.getItem("autodiag_history")||"[]")).length;libraryList.innerHTML=library.map(x=>`<div class="result">${x}</div>`).join("")}
+const saved=localStorage.getItem("autodiag_user"); if(saved)start(JSON.parse(saved));
+</script>
+</body>
+</html>
